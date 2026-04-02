@@ -1,0 +1,122 @@
+{
+    "DESIGN_NAME": "soc_top",
+
+    "VERILOG_FILES": [
+        "dir::../../rtl/picorv32.v",
+        "dir::../../rtl/sync_fifo.v",
+        "dir::../../rtl/uart_tx.v",
+        "dir::../../rtl/uart_rx.v",
+        "dir::../../rtl/uart_top.v",
+        "dir::../../rtl/soc_sram.v",
+        "dir::../../rtl/soc_bus.v",
+        "dir::../../rtl/soc_top.v"
+    ],
+
+    "CLOCK_PORT": "clk",
+    "CLOCK_PERIOD": 20.0,
+
+    "BASE_SDC_FILE": "dir::soc_top.sdc",
+
+    "pdk::sky130A": {
+        "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+        "CLOCK_PERIOD": 20.0
+    },
+
+    "COMMENTS": [
+        "=================================================================",
+        "rv32_soc — PicoRV32 + 1KB SRAM + uart_top on sky130A",
+        "Clock: 50 MHz (20 ns period)",
+        "=================================================================",
+
+        "--- Synthesis ---",
+        "SYNTH_STRATEGY 1 = area-first with reasonable timing effort.",
+        "The dominant area driver is the behavioral SRAM (8192 DFFs for",
+        "256×32-bit storage). Area strategy prevents Yosys from duplicating",
+        "the DFF array for timing, which would make routing unmanageable.",
+        "SYNTH_MAX_FANOUT 8: the 256:1 SRAM read mux tree has high fanout",
+        "at the top of each mux level; 8 limits buffering insertion depth.",
+        "SYNTH_NO_FLAT false: keep hierarchy for Yosys — flattening a",
+        "3000-line PicoRV32 + 8192-DFF SRAM produces very large netlists",
+        "that slow down placement.",
+
+        "--- Floorplan ---",
+        "FP_CORE_UTIL 35: lower than the UART IP (50%) to give place-and-",
+        "route room for the dense DFF cluster from the behavioral SRAM.",
+        "Empirical rule: designs with >5000 DFFs need ≤40% utilisation to",
+        "avoid routing congestion failures on sky130 HD.",
+        "Die area estimate: ~10,300 std cells × ~4 µm² each / 35% util",
+        "≈ 118,000 µm² ≈ 344×344 µm. OpenLane will auto-size to fit.",
+
+        "--- Placement ---",
+        "PL_TARGET_DENSITY 0.45: slightly below utilisation to give the",
+        "global placer room to spread the DFF array and reduce congestion.",
+        "PL_RANDOM_GLB_PLACEMENT false: deterministic placement for",
+        "reproducibility — important for tapeout signoff.",
+
+        "--- Routing ---",
+        "ROUTING_CORES 4: matches the UART IP config.",
+        "GLB_RT_ADJUSTMENT 0.15: reduce global routing resource by 15%",
+        "to force the router to use more vias/layers rather than congesting",
+        "a single routing layer over the SRAM DFF cluster.",
+        "RT_MAX_LAYER met4: stay off met5 for standard cell routing;",
+        "met5 is reserved for power straps in PDN.",
+
+        "--- Power ---",
+        "FP_PDN_AUTO_ADJUST true: auto-sizes power grid to die area.",
+        "FP_PDN_VOFFSET / HOFFSET 12.45: standard sky130 HD values.",
+
+        "--- Timing ---",
+        "CLOCK_PERIOD 20 ns (50 MHz). PicoRV32 closes at ~100 MHz on",
+        "sky130 in isolation; the SoC target of 50 MHz gives 2× margin",
+        "on CPU internals and comfortable slack on the SRAM mux path.",
+        "Hold slack is the tighter constraint — the behavioral SRAM has",
+        "no registered output, so hold on SRAM→bus→CPU is path-dependent.",
+        "If hold violations occur post-route, increase CTS_CLK_BUFFER_LIST",
+        "to insert more hold-fixing buffers.",
+
+        "--- Verification ---",
+        "RUN_CVC true: circuit validity checking (open/short detection).",
+        "RUN_LVS true: layout vs schematic verification.",
+        "RUN_DRC true: design rule checking via Magic.",
+
+        "--- Behavioral SRAM note ---",
+        "This config synthesises the behavioral reg [31:0] mem[0:255] to",
+        "8192 sky130_fd_sc_hd__dfxtp_1 DFFs. For a production tapeout,",
+        "replace soc_sram.v with an instantiation of the sky130 1KB SRAM",
+        "macro (sky130_sram_1kbyte_1rw1r_32x256_8) and add:",
+        "  EXTRA_LEFS: path to sky130_sram_1kbyte_1rw1r_32x256_8.lef",
+        "  EXTRA_GDS:  path to sky130_sram_1kbyte_1rw1r_32x256_8.gds",
+        "  MACRO_PLACEMENT_CFG: sram_placement.cfg",
+        "The macro path also requires one wait-state on SRAM reads in",
+        "soc_bus.v (see the annotated macro path comment in that file)."
+    ],
+
+    "SYNTH_STRATEGY": "AREA 1",
+    "SYNTH_MAX_FANOUT": 8,
+    "SYNTH_NO_FLAT": false,
+
+    "FP_SIZING": "relative",
+    "FP_CORE_UTIL": 35,
+    "FP_PDN_AUTO_ADJUST": true,
+    "FP_PDN_VOFFSET": 12.45,
+    "FP_PDN_HOFFSET": 12.45,
+    "FP_PDN_VPITCH": 153.6,
+    "FP_PDN_HPITCH": 153.6,
+
+    "PL_TARGET_DENSITY": 0.45,
+    "PL_RANDOM_GLB_PLACEMENT": false,
+
+    "ROUTING_CORES": 4,
+    "GLB_RT_ADJUSTMENT": 0.15,
+    "RT_MAX_LAYER": "met4",
+
+    "RUN_CVC": true,
+    "RUN_LVS": true,
+    "RUN_DRC": true,
+
+    "MAGIC_DRC_USE_GDS": true,
+
+    "CLOCK_TREE_SYNTH": true,
+    "CTS_TARGET_SKEW": 200,
+    "CTS_TOLERANCE": 25
+}

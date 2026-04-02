@@ -31,4 +31,4 @@ VCD info: dumpfile uart_top_tb.vcd opened for output.
   ALL TESTS PASSED (6 tests)
 ========================================
 
-./uart_top_tb.v:376: $finish called at 25415000 (1ps)
+uart_top_tb.v:376: $finish called at 25415000 (1ps)

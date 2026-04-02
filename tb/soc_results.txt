@@ -1,0 +1,24 @@
+VCD info: dumpfile soc_top_tb.vcd opened for output.
+
+=== TEST 1: CPU boot (first instruction fetch) ===
+  PASS: id at addr=0x0 within 20 cycles of reset
+
+=== TEST 2: CPU writes 'U','V' via UART TX ===
+  PASS: byte[0] == 'U' = 0x55
+  PASS: byte[1] == 'V' = 0x56
+
+=== TEST 3: IRQ assertion after UART RX ===
+  PASS: RL (irq_en=1, confirmed via bus monitor)
+  Injecting 0xA5 on uart_rx...
+  PASS: irq_out asserted after RX byte received
+
+=== TEST 4: ISR clears IRQ by reading RX_DATA ===
+  PASS: SR read from UART_RX_ADDR (LW x2, 4(x1))
+  PASS: rq_out deasserted after ISR read RX_DATA
+  PASS: CPU resumed SRAM execution after retirq
+
+================================================
+  ALL TESTS PASSED (4 tests)
+================================================
+
+soc_top_tb.v:430: $finish called at 10950000 (1ps)

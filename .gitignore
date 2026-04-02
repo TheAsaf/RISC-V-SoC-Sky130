@@ -1,5 +1,6 @@
 # Simulation artifacts
 tb/uart_sim
+tb/soc_sim
 tb/*.vcd
 
 # OS files
@@ -17,3 +18,6 @@ openlane/runs/
 __pycache__/
 *.pyc
 venv/
+
+# Development/debug scripts (not part of published project)
+docs/_audit_vcd.py
