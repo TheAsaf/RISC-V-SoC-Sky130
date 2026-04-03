@@ -52,235 +52,240 @@ GTK_WHITE = "#E6EDF3"   # bright white for important text
 # ─────────────────────────────────────────────────────────────────────────────
 
 def gen_soc_architecture():
-    fig = plt.figure(figsize=(17, 9.5))
+    # ── Canvas ────────────────────────────────────────────────────────────
+    W, H = 20, 12
+    fig = plt.figure(figsize=(W, H))
     fig.patch.set_facecolor("#FFFFFF")
-    ax = fig.add_axes([0.01, 0.02, 0.97, 0.88])
-    ax.set_xlim(0, 17)
-    ax.set_ylim(0, 9.5)
+    ax = fig.add_axes([0.01, 0.01, 0.97, 0.90])
+    ax.set_xlim(0, W)
+    ax.set_ylim(0, H)
     ax.axis("off")
 
-    # ── Helper: draw a rounded block ────────────────────────────────────
-    def block(x, y, w, h, title, sub="", ec="#000", fc="#fff",
-              tfs=14, sfs=10, lw=2.2, ls="-"):
+    # ── Helper: draw a rounded block and place text inside it ─────────────
+    # Text is laid out top-down: title → subtitle → detail lines.
+    # Everything is auto-centred vertically inside the block.
+    def block(x, y, w, h, title, sub="", details=None,
+              ec="#000", fc="#fff", tfs=15, sfs=11.5, dfs=10.5, lw=2.4):
         rect = FancyBboxPatch(
             (x, y), w, h,
-            boxstyle="round,pad=0,rounding_size=0.22",
-            linewidth=lw, edgecolor=ec, facecolor=fc,
-            linestyle=ls, zorder=2,
+            boxstyle="round,pad=0,rounding_size=0.28",
+            linewidth=lw, edgecolor=ec, facecolor=fc, zorder=2,
         )
         ax.add_patch(rect)
-        ty = y + h / 2 + (0.22 if sub else 0)
-        ax.text(x + w / 2, ty, title,
-                ha="center", va="center", fontsize=tfs,
-                fontweight="bold", color=ec, zorder=3)
-        if sub:
-            ax.text(x + w / 2, y + h / 2 - 0.24, sub,
-                    ha="center", va="center", fontsize=sfs,
-                    color=ec, alpha=0.80, zorder=3)
 
-    # ── Helper: annotate arrow ────────────────────────────────────────────
-    def arr(x1, y1, x2, y2, c, lbl="", bidir=False, lw=2.0, fs=9.5):
+        cx = x + w / 2
+        # Build ordered list of (text, fontsize, bold, italic, alpha)
+        items = [(title, tfs, True,  False, 1.00)]
+        if sub:
+            items.append((sub, sfs, False, False, 0.78))
+        for d in (details or []):
+            items.append((d,   dfs, False, True,  0.70))
+
+        # Estimate total text block height (font_pt / 72 * line_spacing)
+        LEADING = 1.65
+        heights  = [fs / 72 * LEADING for _, fs, *_ in items]
+        GAP      = 0.06   # extra gap between items (data units)
+        total_h  = sum(heights) + GAP * (len(items) - 1)
+
+        # Start y of first item (centred in block)
+        cur = y + h / 2 + total_h / 2
+
+        for txt, fs, bold, italic, alpha in items:
+            item_h = fs / 72 * LEADING
+            cur -= item_h / 2
+            ax.text(cx, cur, txt,
+                    ha="center", va="center",
+                    fontsize=fs,
+                    fontweight="bold" if bold else "normal",
+                    fontstyle="italic" if italic else "normal",
+                    color=ec, alpha=alpha, zorder=3)
+            cur -= item_h / 2 + GAP
+
+    # ── Helper: arrow (horizontal or vertical only) ───────────────────────
+    def arr(x1, y1, x2, y2, c, lbl="", bidir=False, lw=2.4, fs=11):
         sty = "<|-|>" if bidir else "-|>"
-        ax.annotate(
-            "", xy=(x2, y2), xytext=(x1, y1),
-            arrowprops=dict(arrowstyle=sty, color=c, lw=lw,
-                            mutation_scale=16),
-            zorder=5,
-        )
+        ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
+                    arrowprops=dict(arrowstyle=sty, color=c, lw=lw,
+                                    mutation_scale=18), zorder=5)
         if lbl:
             mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-            ax.text(mx, my + 0.24, lbl, ha="center", fontsize=fs,
-                    color=c, fontweight="bold", zorder=6,
-                    bbox=dict(boxstyle="round,pad=0.18", fc="white",
-                              ec="none", alpha=0.96))
+            horiz = abs(x2 - x1) >= abs(y2 - y1)
+            ax.text(mx, my + (0.30 if horiz else 0),
+                    lbl if horiz else lbl,
+                    ha="center" if horiz else "left",
+                    va="bottom"  if horiz else "center",
+                    fontsize=fs, color=c, fontweight="bold", zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.20",
+                              fc="white", ec="none", alpha=0.96))
 
-    # ──────────────────────────────────────────────────────────────────────
-    # Block definitions  (x, y, w, h)
-    # ──────────────────────────────────────────────────────────────────────
-    # PicoRV32
-    CX, CY, CW, CH = 0.3, 1.2, 2.9, 7.8
-    # soc_bus
-    BX, BY, BW, BH = 4.7, 5.4, 3.6, 2.6
+    # ── Block coordinates (x, y, w, h) ────────────────────────────────────
+    #
+    #  All x-centres and vertical connections are aligned so arrows are
+    #  strictly horizontal or vertical — no diagonals.
+    #
+    #  Shared vertical axis for:  soc_bus centre  =  reg-interface centre
+    #                                             =  uart_rx centre  =  7.6
+
+    # PicoRV32 — full-height left column
+    CX, CY, CW, CH = 0.3,  0.5,  3.5, 11.0
+
+    # soc_bus  (centre-x = 7.6)
+    BX, BY, BW, BH = 5.1,  7.8,  5.0,  3.4   # centre-x = 5.1+2.5=7.6 ✓
+
     # soc_sram
-    SX, SY, SW, SH = 9.6, 5.4, 4.8, 3.1
+    SX, SY, SW, SH = 12.1, 7.8,  5.2,  3.4
+
     # uart_top container
-    UX, UY, UW, UH = 4.2, 0.2, 12.3, 4.9
-    # uart_top internals
-    REX, REY, REW, REH = 5.0, 2.4, 2.4, 2.2   # reg interface
-    RXX, RXY, RXW, RXH = 5.0, 0.55, 2.4, 1.45  # uart_rx
-    FIX, FIY, FIW, FIH = 8.3, 2.6, 2.4, 2.0   # sync_fifo
-    TWX, TWY, TWW, TWH = 11.5, 2.6, 3.3, 2.0  # uart_tx
+    UX, UY, UW, UH = 4.4,  0.30, 15.0, 7.05  # top = 7.35
 
-    # ──────────────────────────────────────────────────────────────────────
-    # Draw blocks
-    # ──────────────────────────────────────────────────────────────────────
+    # uart_top internals  (all on same y-row for the TX chain)
+    #   centre-x of reg  = REX + REW/2 = 5.8 + 1.8 = 7.6 ✓
+    REX, REY, REW, REH = 5.8,  3.8,  3.6,  3.2   # top = 7.0
+    RXX, RXY, RXW, RXH = 5.8,  0.75, 3.6,  2.6   # top = 3.35 ; centre-x = 7.6 ✓
+    FIX, FIY, FIW, FIH = 11.0, 3.8,  3.2,  3.2   # TX chain, same row
+    TWX, TWY, TWW, TWH = 15.4, 3.8,  3.6,  3.2   # uart_tx
 
-    # PicoRV32 CPU
-    block(CX, CY, CW, CH, "PicoRV32", "RV32I CPU",
-          ec=CPU_EC, fc=CPU_FC, tfs=16, sfs=12)
-    params = [
-        "ENABLE_IRQ = 1",
-        "ENABLE_IRQ_QREGS = 0",
-        "BARREL_SHIFTER = 1",
-        "no MUL / DIV",
-        "STACKADDR = 0x400",
-        "PROGADDR_IRQ = 0x10",
-    ]
-    for i, p in enumerate(params):
-        ax.text(CX + CW / 2, CY + CH - 2.1 - i * 0.44,
-                p, ha="center", fontsize=9, color=CPU_EC,
-                fontstyle="italic", zorder=3)
+    # Shared y-centre for TX data path (reg → fifo → uart_tx)
+    TX_Y   = REY + REH / 2    # 5.4
+    CONN_X = 7.6               # shared vertical axis
+
+    # ── Draw blocks ────────────────────────────────────────────────────────
+
+    # PicoRV32
+    block(CX, CY, CW, CH, "PicoRV32", "RV32I CPU · 50 MHz",
+          details=["ENABLE_IRQ = 1", "PROGADDR_IRQ = 0x10",
+                   "BARREL_SHIFTER = 1", "no MUL / DIV"],
+          ec=CPU_EC, fc=CPU_FC, tfs=18, sfs=13, dfs=11)
 
     # soc_bus
     block(BX, BY, BW, BH, "soc_bus", "address decoder",
-          ec=BUS_EC, fc=BUS_FC, tfs=14, sfs=10)
-    for i, line in enumerate([
-        "SRAM: addr[31:10] == 0",
-        "UART: addr[31:4] == 0x2000000",
-    ]):
-        ax.text(BX + BW / 2, BY + 0.85 - i * 0.40,
-                line, ha="center", fontsize=8.5, color=BUS_EC, zorder=3)
+          details=["SRAM:  addr[31:10] == 0",
+                   "UART:  addr[31:4] == 0x2000000"],
+          ec=BUS_EC, fc=BUS_FC, tfs=16, sfs=12, dfs=11)
 
     # soc_sram
     block(SX, SY, SW, SH, "soc_sram", "256 × 32-bit  ·  1 KB",
-          ec=SRAM_EC, fc=SRAM_FC, tfs=14, sfs=10)
-    for i, line in enumerate([
-        "0x0000 – 0x03FF",
-        "combinational read",
-        "sync byte-lane write",
-    ]):
-        ax.text(SX + SW / 2, SY + 1.85 - i * 0.48,
-                line, ha="center", fontsize=9, color=SRAM_EC, zorder=3)
+          details=["0x0000 – 0x03FF",
+                   "combinational read",
+                   "sync byte-lane write"],
+          ec=SRAM_EC, fc=SRAM_FC, tfs=16, sfs=12, dfs=11)
 
-    # uart_top container (dashed border)
+    # uart_top container (dashed outline)
     rect_ut = FancyBboxPatch(
         (UX, UY), UW, UH,
-        boxstyle="round,pad=0,rounding_size=0.30",
-        linewidth=2.4, edgecolor=UART_EC, facecolor=UART_FC,
+        boxstyle="round,pad=0,rounding_size=0.35",
+        linewidth=2.6, edgecolor=UART_EC, facecolor=UART_FC,
         linestyle="--", zorder=1,
     )
     ax.add_patch(rect_ut)
-    ax.text(UX + UW / 2, UY + UH - 0.30, "uart_top",
-            ha="center", fontsize=15, fontweight="bold",
+    ax.text(UX + UW / 2, UY + UH - 0.40, "uart_top",
+            ha="center", fontsize=17, fontweight="bold",
             color=UART_EC, zorder=3)
 
     # reg interface
     block(REX, REY, REW, REH, "reg interface", "4 registers",
-          ec=REG_EC, fc=REG_FC, tfs=12, sfs=9)
-    for i, r in enumerate(["TX_DATA [W]", "RX_DATA [R]", "STATUS [R/W1C]", "CTRL [RW]"]):
-        ax.text(REX + REW / 2, REY + 1.72 - i * 0.38,
-                r, ha="center", fontsize=7.5, color=REG_EC, zorder=3)
+          details=["TX_DATA  [W]", "RX_DATA  [R]",
+                   "STATUS  [R/W1C]", "CTRL  [RW]"],
+          ec=REG_EC, fc=REG_FC, tfs=14, sfs=11.5, dfs=10.5)
 
     # uart_rx
-    block(RXX, RXY, RXW, RXH, "uart_rx", "2-FF sync",
-          ec=RX_EC, fc=RX_FC, tfs=12, sfs=9)
-    ax.text(RXX + RXW / 2, RXY + 0.32,
-            "mid-bit sample", ha="center", fontsize=8, color=RX_EC, zorder=3)
+    block(RXX, RXY, RXW, RXH, "uart_rx",
+          "2-FF sync  ·  mid-bit sample",
+          ec=RX_EC, fc=RX_FC, tfs=14, sfs=11)
 
     # sync_fifo
-    block(FIX, FIY, FIW, FIH, "sync_fifo", "8-deep TX",
-          ec=FIFO_EC, fc=FIFO_FC, tfs=12, sfs=9)
-    ax.text(FIX + FIW / 2, FIY + 0.36,
-            "fall-through read", ha="center", fontsize=8, color=FIFO_EC, zorder=3)
+    block(FIX, FIY, FIW, FIH, "sync_fifo", "8-deep TX FIFO",
+          details=["fall-through read"],
+          ec=FIFO_EC, fc=FIFO_FC, tfs=14, sfs=11.5, dfs=10.5)
 
     # uart_tx
     block(TWX, TWY, TWW, TWH, "uart_tx", "8N1 / 8E1 / 8O1",
-          ec=TX_EC, fc=TX_FC, tfs=12, sfs=9)
-    ax.text(TWX + TWW / 2, TWY + 0.36,
-            "baud counter  16-bit", ha="center", fontsize=8, color=TX_EC, zorder=3)
+          details=["16-bit baud counter"],
+          ec=TX_EC, fc=TX_FC, tfs=14, sfs=11.5, dfs=10.5)
 
-    # ──────────────────────────────────────────────────────────────────────
-    # Arrows
-    # ──────────────────────────────────────────────────────────────────────
+    # ── Arrows ─────────────────────────────────────────────────────────────
 
-    # 1. CPU ↔ soc_bus  (horizontal, both at y=6.7)
-    BBUS_Y = BY + BH / 2  # 6.7
-    arr(CX + CW, BBUS_Y, BX, BBUS_Y,
-        CPU_EC, "32-bit mem bus", bidir=True, lw=2.4, fs=10)
+    BUS_Y = BY + BH / 2   # vertical centre of soc_bus row = 9.5
+
+    # 1. CPU ↔ soc_bus  (horizontal)
+    arr(CX + CW, BUS_Y, BX, BUS_Y,
+        CPU_EC, "32-bit mem bus", bidir=True, lw=2.6, fs=11.5)
 
     # 2. soc_bus ↔ soc_sram  (horizontal)
-    arr(BX + BW, BBUS_Y, SX, SY + SH / 2,
-        SRAM_EC, "SRAM select", bidir=True, lw=2.2, fs=9.5)
+    arr(BX + BW, BUS_Y, SX, SY + SH / 2,
+        SRAM_EC, "SRAM select", bidir=True, lw=2.4, fs=11.5)
 
-    # 3. soc_bus → uart_top  (vertical down, from bus bottom-center)
-    BUS_CX = BX + BW / 2   # 6.5
-    arr(BUS_CX, BY, BUS_CX, UY + UH,
-        BUS_EC, "UART select", bidir=False, lw=2.2, fs=9.5)
+    # 3. soc_bus → reg interface  (vertical down, aligned on CONN_X)
+    #    Arrow starts at soc_bus bottom, ends at reg interface top
+    arr(CONN_X, BY, CONN_X, REY + REH,
+        BUS_EC, "UART select", bidir=False, lw=2.4, fs=11.5)
 
-    # 4. uart_rx → reg interface  (vertical up — directly stacked)
-    REG_CX = REX + REW / 2   # 6.2
-    arr(REG_CX, RXY + RXH, REG_CX, REY,
-        RX_EC, "rx_data\nrx_valid", lw=2.0, fs=8.5)
+    # 4. uart_rx → reg interface  (vertical up, same CONN_X)
+    arr(CONN_X, RXY + RXH, CONN_X, REY,
+        RX_EC, "", lw=2.2)
+    ax.text(CONN_X + 0.25, (RXY + RXH + REY) / 2,
+            "rx_data\nrx_valid",
+            ha="left", va="center", fontsize=10, color=RX_EC,
+            fontweight="bold",
+            bbox=dict(boxstyle="round,pad=0.18",
+                      fc="white", ec="none", alpha=0.92), zorder=6)
 
-    # 5. reg → sync_fifo  (horizontal)
-    TX_ROW = FIY + FIH / 2   # 3.6
-    arr(REX + REW, TX_ROW, FIX, TX_ROW,
-        FIFO_EC, "", lw=2.0)
+    # 5. reg → sync_fifo  (horizontal, at TX_Y)
+    arr(REX + REW, TX_Y, FIX, TX_Y, FIFO_EC, lw=2.2)
 
-    # 6. sync_fifo → uart_tx  (horizontal)
-    arr(FIX + FIW, TX_ROW, TWX, TX_ROW,
-        TX_EC, "", lw=2.0)
+    # 6. sync_fifo → uart_tx  (horizontal, at TX_Y)
+    arr(FIX + FIW, TX_Y, TWX, TX_Y, TX_EC, lw=2.2)
 
     # 7. uart_tx → TX pin  (horizontal right)
-    ax.annotate("", xy=(16.5, TX_ROW), xytext=(TWX + TWW, TX_ROW),
-                arrowprops=dict(arrowstyle="-|>", color=TX_EC, lw=2.4,
+    ax.annotate("", xy=(19.5, TX_Y), xytext=(TWX + TWW, TX_Y),
+                arrowprops=dict(arrowstyle="-|>", color=TX_EC, lw=2.6,
+                                mutation_scale=20), zorder=5)
+    ax.text(19.6, TX_Y, "TX", ha="left", va="center",
+            fontsize=15, fontweight="bold", color=TX_EC, zorder=6)
+
+    # 8. RX pin → uart_rx  (L-shape: horizontal bottom rail, then up)
+    RX_RAIL  = 0.52            # y of horizontal rail (below uart_rx bottom)
+    RX_RIGHT = RXX + RXW       # right edge of uart_rx = 9.4
+    RX_MID_Y = RXY + RXH / 2  # centre of uart_rx = 2.05
+
+    ax.plot([19.5, RX_RIGHT], [RX_RAIL, RX_RAIL],
+            color=RX_EC, lw=2.4, zorder=4, solid_capstyle="round")
+    ax.annotate("", xy=(RX_RIGHT, RX_MID_Y),
+                xytext=(RX_RIGHT, RX_RAIL),
+                arrowprops=dict(arrowstyle="-|>", color=RX_EC, lw=2.4,
                                 mutation_scale=18), zorder=5)
-    ax.text(16.55, TX_ROW, "TX", ha="left", va="center",
-            fontsize=14, fontweight="bold", color=TX_EC, zorder=6)
+    ax.text(19.6, RX_RAIL, "RX", ha="left", va="center",
+            fontsize=15, fontweight="bold", color=RX_EC, zorder=6)
 
-    # 8. RX → uart_rx   L-shaped: horizontal along bottom then up
-    RX_BOTTOM = 0.85  # run below internal blocks
-    RXB_CX = RXX + RXW  # right edge of uart_rx = 7.4
-    # horizontal segment from right edge → uart_rx right
-    ax.plot([16.5, RXB_CX], [RX_BOTTOM, RX_BOTTOM],
-            color=RX_EC, lw=2.2, zorder=4, solid_capstyle="round")
-    # vertical segment up into uart_rx
-    ax.annotate("", xy=(RXB_CX, RXY + RXH / 2),
-                xytext=(RXB_CX, RX_BOTTOM),
-                arrowprops=dict(arrowstyle="-|>", color=RX_EC, lw=2.2,
-                                mutation_scale=16), zorder=5)
-    ax.text(16.55, RX_BOTTOM, "RX", ha="left", va="center",
-            fontsize=14, fontweight="bold", color=RX_EC, zorder=6)
-
-    # 9. IRQ: uart_top left → CPU right  (horizontal at y=2.5)
-    IRQ_Y = 2.55
+    # 9. IRQ: uart_top left edge → CPU right edge  (horizontal)
+    IRQ_Y = 2.1
     ax.annotate("", xy=(CX + CW, IRQ_Y), xytext=(UX, IRQ_Y),
-                arrowprops=dict(arrowstyle="-|>", color=IRQ_C, lw=2.2,
-                                mutation_scale=15), zorder=5)
-    ax.text((CX + CW + UX) / 2, IRQ_Y + 0.22,
-            "irq[0]", ha="center", fontsize=10.5, fontweight="bold",
+                arrowprops=dict(arrowstyle="-|>", color=IRQ_C, lw=2.4,
+                                mutation_scale=17), zorder=5)
+    ax.text((CX + CW + UX) / 2, IRQ_Y + 0.32,
+            "irq[0]", ha="center", fontsize=12.5, fontweight="bold",
             color=IRQ_C, zorder=6,
-            bbox=dict(boxstyle="round,pad=0.22", fc="white",
-                      ec=IRQ_C, alpha=0.97, lw=1.5))
+            bbox=dict(boxstyle="round,pad=0.26", fc="white",
+                      ec=IRQ_C, alpha=0.97, lw=1.8))
 
-    # ──────────────────────────────────────────────────────────────────────
-    # Signal labels on arrows (bus width annotations)
-    # ──────────────────────────────────────────────────────────────────────
-    ax.text((CX + CW + BX) / 2, BBUS_Y - 0.36,
-            "mem_valid / mem_ready / mem_addr[31:0]\nmem_wdata[31:0] / mem_wstrb[3:0] / mem_rdata[31:0]",
-            ha="center", fontsize=7.8, color=CPU_EC, zorder=6,
-            bbox=dict(boxstyle="round,pad=0.18", fc="white", ec="none", alpha=0.9))
+    # ── Title ──────────────────────────────────────────────────────────────
+    ax.text(W / 2, 11.72, "rv32_soc — System Architecture",
+            ha="center", fontsize=22, fontweight="bold", color=TXT_DARK)
+    ax.text(W / 2, 11.28,
+            "PicoRV32 RV32I  ·  1 KB SRAM  ·  UART IP  ·  sky130  ·  50 MHz",
+            ha="center", fontsize=12.5, color=TXT_GRAY)
 
-    # ──────────────────────────────────────────────────────────────────────
-    # Title + subtitle
-    # ──────────────────────────────────────────────────────────────────────
-    ax.text(8.5, 9.3, "rv32_soc — System Architecture",
-            ha="center", fontsize=20, fontweight="bold", color=TXT_DARK)
-    ax.text(8.5, 8.87,
-            "PicoRV32 RV32I  ·  1 KB SRAM  ·  UART IP (8N1 / parity / 8-deep FIFO)  ·  sky130  ·  50 MHz",
-            ha="center", fontsize=11, color=TXT_GRAY)
-
-    # Legend
+    # ── Legend ─────────────────────────────────────────────────────────────
     patches = [
-        mpatches.Patch(fc=CPU_FC, ec=CPU_EC, label="CPU Core", lw=2),
-        mpatches.Patch(fc=BUS_FC, ec=BUS_EC, label="Bus Decoder", lw=2),
-        mpatches.Patch(fc=SRAM_FC, ec=SRAM_EC, label="SRAM", lw=2),
-        mpatches.Patch(fc=UART_FC, ec=UART_EC, label="UART Peripheral", lw=2),
-        mpatches.Patch(fc="white", ec=IRQ_C, label="IRQ path", lw=2),
+        mpatches.Patch(fc=CPU_FC,  ec=CPU_EC,  label="CPU Core",         lw=2),
+        mpatches.Patch(fc=BUS_FC,  ec=BUS_EC,  label="Bus Decoder",      lw=2),
+        mpatches.Patch(fc=SRAM_FC, ec=SRAM_EC, label="SRAM",             lw=2),
+        mpatches.Patch(fc=UART_FC, ec=UART_EC, label="UART Peripheral",  lw=2),
+        mpatches.Patch(fc="white", ec=IRQ_C,   label="IRQ path",         lw=2),
     ]
-    ax.legend(handles=patches, loc="lower left",
-              fontsize=9.5, framealpha=0.97, edgecolor="#E5E7EB",
-              bbox_to_anchor=(0.01, 0.01))
+    ax.legend(handles=patches, loc="lower left", fontsize=10.5,
+              framealpha=0.97, edgecolor="#E5E7EB",
+              bbox_to_anchor=(0.005, 0.005))
 
     out = os.path.join(IMG_DIR, "soc_architecture.png")
     plt.savefig(out, dpi=160, bbox_inches="tight",

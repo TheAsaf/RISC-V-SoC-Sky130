@@ -23,6 +23,18 @@
 
 ---
 
+## What we built
+
+A small computer on a chip, designed from scratch in hardware description language (Verilog) and manufactured on real silicon.
+
+The chip has a **CPU** that runs code, a **memory** that stores it, and a **UART** — a standard interface that lets the chip send and receive bytes over a serial wire (the same way a microcontroller talks to a terminal).
+
+When you send a byte to the chip, the hardware detects it, interrupts the CPU, and the CPU reads and echoes it back — entirely in hardware, with no operating system, no libraries, nothing external.
+
+Every part of that path — from the serial wire all the way through hardware logic, interrupt, software handler, and back — is implemented here and verified in simulation.
+
+---
+
 ## What makes this project interesting
 
 This isn't a tutorial — it's a complete, working SoC designed from first principles.
